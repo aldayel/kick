@@ -109,8 +109,8 @@ app.get('/api/webhook-events', (req, res) => {
 // Serve React frontend static files
 app.use(express.static(path.join(__dirname, 'kick-chat-frontend', 'build')));
 
-// Catch-all to serve index.html for React Router
-app.get('*', (req, res) => {
+// Only serve index.html for non-API, non-webhook GET requests
+app.get(/^\/(?!api|kick-webhook).*/, (req, res) => {
   res.sendFile(path.join(__dirname, 'kick-chat-frontend', 'build', 'index.html'));
 });
 
