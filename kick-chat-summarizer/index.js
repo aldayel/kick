@@ -106,6 +106,12 @@ app.get('/api/webhook-events', (req, res) => {
   );
 });
 
+// OAuth callback endpoint for Kick.com
+app.get('/oauth/callback', (req, res) => {
+  console.log('OAuth callback received:', req.query);
+  res.send('<h2>Authorization successful! You can close this window.</h2>');
+});
+
 // Serve React frontend static files
 app.use(express.static(path.join(__dirname, 'kick-chat-frontend', 'build')));
 
