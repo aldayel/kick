@@ -100,6 +100,35 @@ app.get('/api/talking-points/:channel', async (req, res) => {
   );
 });
 
+// Secure ingest endpoint for Python chat reader
+app.post('/api/ingest-message', async (req, res) => {
+  // Optional: Use a shared secret for authentication
+  const AUTH_TOKEN = process.env.INGEST_TOKEN || 'changeme';
+  if (req.headers['x-ingest-token'] !== AUTH_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const { channel, username, message, timestamp } = req.body;
+  if (!channel || !username || !message || !timestamp) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  try {
+    const { analyzeMessage } = require('./gptAnalysis');
+    const analysis = await analyzeMessage(message);
+    db.run(
+      `INSERT INTO messages (channel, username, message, timestamp, sentiment, emotion, toxicity, engagement) VALUES (?, ?, ?, ?, ?, ?, ?, ?)` ,
+      [channel, username, message, timestamp, analysis.sentiment, analysis.emotion, analysis.toxicity, analysis.engagement]
+    );
+    // Optionally broadcast to WebSocket clients
+    if (typeof broadcast === 'function') {
+      broadcast({ type: 'new_message', data: { channel, username, message, timestamp, ...analysis } });
+    }
+    res.json({ status: 'ok' });
+  } catch (e) {
+    console.error('Ingest error:', e);
+    res.status(500).json({ error: 'Failed to analyze or store message.' });
+  }
+});
+
 if (process.env.NODE_ENV === 'production') {
   const clientBuildPath = path.join(__dirname, '../dist');
   app.use(express.static(clientBuildPath));
