@@ -5,6 +5,7 @@ const db = require('./db');
 const { connectToKickChat } = require('./kickWs');
 const { summarizeMessages } = require('./gpt');
 const path = require('path');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -107,9 +108,31 @@ app.get('/api/webhook-events', (req, res) => {
 });
 
 // OAuth callback endpoint for Kick.com
-app.get('/oauth/callback', (req, res) => {
-  console.log('OAuth callback received:', req.query);
-  res.send('<h2>Authorization successful! You can close this window.</h2>');
+app.get('/oauth/callback', async (req, res) => {
+  const code = req.query.code;
+  if (!code) {
+    return res.send('<h2>Authorization failed: No code provided.</h2>');
+  }
+  try {
+    const tokenRes = await axios.post('https://kick.com/oauth2/token', null, {
+      params: {
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'https://chatly-e0ut.onrender.com/oauth/callback',
+        client_id: process.env.KICK_CLIENT_ID || '01K09KDXDAQAWJF9V1VAD0TEFV',
+        client_secret: process.env.KICK_CLIENT_SECRET || '45d847c20951ae22a8a9644639de2c03795a31a050cbfe8114dee41d365fed52'
+      }
+    });
+    const { access_token, refresh_token, expires_in, user_id } = tokenRes.data;
+    db.run(
+      `INSERT INTO oauth_tokens (user_id, access_token, refresh_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)`,
+      [user_id || '', access_token, refresh_token, Date.now() + expires_in * 1000, Date.now()]
+    );
+    res.send('<h2>Authorization successful! You can close this window.</h2>');
+  } catch (e) {
+    console.error('OAuth token exchange failed:', e.response?.data || e.message);
+    res.send('<h2>Authorization failed: Could not exchange code for token.</h2>');
+  }
 });
 
 // Serve React frontend static files

@@ -23,6 +23,14 @@ db.serialize(() => {
     event_data TEXT,
     received_at INTEGER
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at INTEGER,
+    created_at INTEGER
+  )`);
 });
 
 module.exports = db;
