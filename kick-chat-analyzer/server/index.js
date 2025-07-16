@@ -42,16 +42,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.post('/api/monitor/:channel', (req, res) => {
-  startMonitoring(req.params.channel);
-  res.json({ status: 'monitoring', channel: req.params.channel });
-});
-
-app.post('/api/stop/:channel', (req, res) => {
-  stopMonitoring(req.params.channel);
-  res.json({ status: 'stopped', channel: req.params.channel });
-});
-
 app.get('/api/messages/:channel', (req, res) => {
   db.all(
     'SELECT * FROM messages WHERE channel = ? ORDER BY timestamp DESC LIMIT 100',
