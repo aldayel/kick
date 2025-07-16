@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis } from 'recharts';
+import { FaRobot, FaSmile, FaFrown, FaMeh, FaComments, FaChartBar } from 'react-icons/fa';
+import logo from './assets/react.svg';
 import './App.css';
+
+const SENTIMENT_COLORS = {
+  positive: '#2ecc40',
+  negative: '#ff4136',
+  neutral: '#888',
+};
 
 function App() {
   const [channel, setChannel] = useState('');
@@ -7,25 +16,46 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [stats, setStats] = useState(null);
   const [talkingPoints, setTalkingPoints] = useState([]);
-  const ws = useRef(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const chatBoxRef = useRef(null);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   useEffect(() => {
     if (!monitoring || !channel) return;
+    setLoading(true);
+    setError('');
     const fetchMessages = async () => {
-      const res = await fetch(`/api/messages/${channel}`);
-      setMessages(await res.json());
+      try {
+        const res = await fetch(`/api/messages/${channel}`);
+        setMessages(await res.json());
+      } catch (e) {
+        setError('Failed to fetch messages.');
+      }
     };
     const fetchStats = async () => {
-      const res = await fetch(`/api/stats/${channel}`);
-      setStats(await res.json());
+      try {
+        const res = await fetch(`/api/stats/${channel}`);
+        setStats(await res.json());
+      } catch (e) {
+        setError('Failed to fetch stats.');
+      }
     };
     const fetchTalkingPoints = async () => {
-      const res = await fetch(`/api/talking-points/${channel}`);
-      setTalkingPoints(await res.json());
+      try {
+        const res = await fetch(`/api/talking-points/${channel}`);
+        setTalkingPoints(await res.json());
+      } catch (e) {
+        setError('Failed to fetch talking points.');
+      }
     };
-    fetchMessages();
-    fetchStats();
-    fetchTalkingPoints();
+    Promise.all([fetchMessages(), fetchStats(), fetchTalkingPoints()]).finally(() => setLoading(false));
     const interval = setInterval(() => {
       fetchMessages();
       fetchStats();
@@ -40,62 +70,144 @@ function App() {
   }, [monitoring, channel]);
 
   const handleStart = async () => {
-    const ch = channel.replace('https://kick.com/', '');
-    setChannel(ch);
-    await fetch(`/api/monitor/${ch}`, { method: 'POST' });
-    setMonitoring(true);
+    setError('');
+    setLoading(true);
+    try {
+      const ch = channel.replace('https://kick.com/', '');
+      setChannel(ch);
+      const res = await fetch(`/api/monitor/${ch}`, { method: 'POST' });
+      if (!res.ok) throw new Error('Failed to start monitoring');
+      setMonitoring(true);
+    } catch (e) {
+      setError('Could not start monitoring.');
+    } finally {
+      setLoading(false);
+    }
   };
   const handleStop = async () => {
-    await fetch(`/api/stop/${channel}`, { method: 'POST' });
-    setMonitoring(false);
+    setError('');
+    setLoading(true);
+    try {
+      await fetch(`/api/stop/${channel}`, { method: 'POST' });
+      setMonitoring(false);
+    } catch (e) {
+      setError('Could not stop monitoring.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Prepare data for charts
+  const sentimentData = stats ? [
+    { name: 'Positive', value: stats.positive, color: SENTIMENT_COLORS.positive },
+    { name: 'Negative', value: stats.negative, color: SENTIMENT_COLORS.negative },
+    { name: 'Neutral', value: stats.neutral, color: SENTIMENT_COLORS.neutral },
+  ] : [];
+  const toxicityData = stats ? [
+    { name: 'Toxicity', value: stats.avgToxicity },
+    { name: 'Non-toxic', value: 1 - stats.avgToxicity },
+  ] : [];
+
   return (
-    <div className="container">
-      <h1>Kick.com Live Chat Analyzer</h1>
-      <div className="input-group">
-        <input
-          type="text"
-          placeholder="Enter Kick.com stream URL or channel name"
-          value={channel}
-          onChange={e => setChannel(e.target.value)}
-          disabled={monitoring}
-        />
-        {!monitoring ? (
-          <button onClick={handleStart} disabled={!channel}>Start Monitoring</button>
-        ) : (
-          <button onClick={handleStop}>Stop</button>
-        )}
-      </div>
-      <div className="main-content">
-        <div className="chat-section">
-          <h2>Live Chat</h2>
-          <div className="chat-box">
-            {messages.map(msg => (
-              <div key={msg.id} className={`chat-msg ${msg.sentiment}`}>
-                <span className="user">{msg.username}:</span> {msg.message}
-                <span className="meta">[{msg.sentiment}, {msg.emotion}, tox: {msg.toxicity}]</span>
-              </div>
-            ))}
+    <div className="app-bg">
+      <header className="header">
+        <img src={logo} alt="Logo" className="header-logo" />
+        <span className="header-title">Kick.com Live Chat Analyzer</span>
+      </header>
+      <div className="container">
+        <div className="input-group">
+          <input
+            type="text"
+            placeholder="Enter Kick.com stream URL or channel name"
+            value={channel}
+            onChange={e => setChannel(e.target.value)}
+            disabled={monitoring || loading}
+          />
+          {!monitoring ? (
+            <button onClick={handleStart} disabled={!channel || loading}>
+              {loading ? 'Starting...' : 'Start Monitoring'}
+            </button>
+          ) : (
+            <button onClick={handleStop} disabled={loading}>
+              {loading ? 'Stopping...' : 'Stop'}
+            </button>
+          )}
+        </div>
+        {error && <div className="error-alert">{error}</div>}
+        <div className="main-content">
+          <div className="chat-section">
+            <h2><FaComments /> Live Chat</h2>
+            <div className="chat-box" ref={chatBoxRef}>
+              {loading && <div className="loading">Loading chat...</div>}
+              {!loading && messages.length === 0 && <div className="empty">No messages yet.</div>}
+              {messages.map(msg => (
+                <div key={msg.id} className={`chat-msg ${msg.sentiment}`}>
+                  <div className="chat-msg-header">
+                    <span className="user-avatar">{msg.username ? msg.username[0].toUpperCase() : '?'}</span>
+                    <span className="user">{msg.username}:</span>
+                  </div>
+                  <span className="msg-text">{msg.message}</span>
+                  <span className="meta">
+                    {msg.sentiment === 'positive' && <FaSmile color={SENTIMENT_COLORS.positive} title="Positive" />} 
+                    {msg.sentiment === 'negative' && <FaFrown color={SENTIMENT_COLORS.negative} title="Negative" />} 
+                    {msg.sentiment === 'neutral' && <FaMeh color={SENTIMENT_COLORS.neutral} title="Neutral" />} 
+                    {msg.sentiment}, {msg.emotion}, tox: {(msg.toxicity * 100).toFixed(0)}%
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="stats-section">
-          <h2>Stats</h2>
-          {stats ? (
-            <ul>
-              <li>Total messages: {stats.total}</li>
-              <li>Positive: {(stats.positive * 100).toFixed(1)}%</li>
-              <li>Negative: {(stats.negative * 100).toFixed(1)}%</li>
-              <li>Neutral: {(stats.neutral * 100).toFixed(1)}%</li>
-              <li>Avg Toxicity: {(stats.avgToxicity * 100).toFixed(1)}%</li>
-            </ul>
-          ) : <p>No stats yet.</p>}
-        </div>
-        <div className="talking-points-section">
-          <h2>AI Talking Points</h2>
-          <ul>
-            {talkingPoints.map((tp, i) => <li key={i}>{tp}</li>)}
-          </ul>
+          <div className="stats-section">
+            <h2><FaChartBar /> Stats</h2>
+            {stats ? (
+              <>
+                <div className="chart-row">
+                  <div className="chart-card">
+                    <h4>Sentiment</h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie data={sentimentData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={60} label>
+                          {sentimentData.map((entry, idx) => (
+                            <Cell key={`cell-${idx}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="chart-card">
+                    <h4>Toxicity</h4>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={toxicityData} layout="vertical">
+                        <XAxis type="number" domain={[0, 1]} hide />
+                        <YAxis type="category" dataKey="name" hide />
+                        <Bar dataKey="value" fill="#ff4136" radius={8} />
+                        <Tooltip />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <ul className="stats-list">
+                  <li><b>Total messages:</b> {stats.total}</li>
+                  <li><b>Positive:</b> {(stats.positive * 100).toFixed(1)}%</li>
+                  <li><b>Negative:</b> {(stats.negative * 100).toFixed(1)}%</li>
+                  <li><b>Neutral:</b> {(stats.neutral * 100).toFixed(1)}%</li>
+                  <li><b>Avg Toxicity:</b> {(stats.avgToxicity * 100).toFixed(1)}%</li>
+                </ul>
+              </>
+            ) : <p>No stats yet.</p>}
+          </div>
+          <div className="talking-points-section">
+            <h2><FaRobot /> AI Talking Points</h2>
+            <div className="tp-list">
+              {talkingPoints.length === 0 && <div className="empty">No talking points yet.</div>}
+              {talkingPoints.map((tp, i) => (
+                <div className="tp-card" key={i}>
+                  <span className="tp-emoji">💡</span> {tp}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
