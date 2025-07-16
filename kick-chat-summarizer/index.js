@@ -82,8 +82,27 @@ app.get('/api/summary/:channel', (req, res) => {
 
 // Webhook endpoint for Kick.com
 app.post('/kick-webhook', (req, res) => {
+  const eventType = req.body.type || 'unknown';
+  const eventData = JSON.stringify(req.body);
+  const receivedAt = Date.now();
+  db.run(
+    `INSERT INTO webhook_events (event_type, event_data, received_at) VALUES (?, ?, ?)` ,
+    [eventType, eventData, receivedAt]
+  );
   console.log('Received webhook from Kick.com:', req.body);
   res.status(200).send('OK');
+});
+
+// Fetch latest webhook events
+app.get('/api/webhook-events', (req, res) => {
+  db.all(
+    'SELECT * FROM webhook_events ORDER BY received_at DESC LIMIT 100',
+    [],
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows);
+    }
+  );
 });
 
 app.listen(PORT, () => {

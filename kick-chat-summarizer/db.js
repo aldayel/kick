@@ -17,6 +17,12 @@ db.serialize(() => {
     summary TEXT,
     created_at INTEGER
   )`);
+  db.run(`CREATE TABLE IF NOT EXISTS webhook_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT,
+    event_data TEXT,
+    received_at INTEGER
+  )`);
 });
 
 module.exports = db;
