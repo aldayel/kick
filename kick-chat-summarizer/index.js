@@ -4,6 +4,7 @@ const cors = require('cors');
 const db = require('./db');
 const { connectToKickChat } = require('./kickWs');
 const { summarizeMessages } = require('./gpt');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -103,6 +104,14 @@ app.get('/api/webhook-events', (req, res) => {
       res.json(rows);
     }
   );
+});
+
+// Serve React frontend static files
+app.use(express.static(path.join(__dirname, 'kick-chat-frontend', 'build')));
+
+// Catch-all to serve index.html for React Router
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'kick-chat-frontend', 'build', 'index.html'));
 });
 
 app.listen(PORT, () => {
