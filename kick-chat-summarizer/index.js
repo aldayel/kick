@@ -135,16 +135,11 @@ app.get('/oauth/callback', async (req, res) => {
   }
 });
 
-// Fetch chatroom info for a given channel using RapidAPI
+// Fetch chatroom info for a given channel using the official Kick API
 app.get('/api/chatroom/:channel', async (req, res) => {
   const channel = req.params.channel;
   try {
-    const response = await axios.get(`https://kick-chat-api.p.rapidapi.com/chatroom/${channel}`, {
-      headers: {
-        'X-RapidAPI-Key': '91dda1bc03msh22733699b805f59p170e32jsna59f4b6c0e58',
-        'X-RapidAPI-Host': 'kick-chat-api.p.rapidapi.com'
-      }
-    });
+    const response = await axios.get(`https://kick.com/api/v2/channels/${channel}`);
     res.json(response.data);
   } catch (e) {
     res.status(500).json({ error: e.response?.data || e.message });
