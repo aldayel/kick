@@ -80,6 +80,12 @@ app.get('/api/summary/:channel', (req, res) => {
   );
 });
 
+// Webhook endpoint for Kick.com
+app.post('/kick-webhook', (req, res) => {
+  console.log('Received webhook from Kick.com:', req.body);
+  res.status(200).send('OK');
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
