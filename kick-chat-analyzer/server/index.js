@@ -2,7 +2,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const db = require('./db');
-const { startMonitoring, stopMonitoring } = require('./chatMonitor');
 const http = require('http');
 const WebSocket = require('ws');
 const { generateTalkingPoints } = require('./gptAnalysis');
