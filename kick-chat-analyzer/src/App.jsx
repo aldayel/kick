@@ -12,7 +12,6 @@ const SENTIMENT_COLORS = {
 
 function App() {
   const [channel, setChannel] = useState('');
-  const [monitoring, setMonitoring] = useState(false);
   const [messages, setMessages] = useState([]);
   const [stats, setStats] = useState(null);
   const [talkingPoints, setTalkingPoints] = useState([]);
@@ -28,7 +27,7 @@ function App() {
   }, [messages]);
 
   useEffect(() => {
-    if (!monitoring || !channel) return;
+    if (!channel) return;
     setLoading(true);
     setError('');
     const fetchMessages = async () => {
@@ -67,35 +66,7 @@ function App() {
       clearInterval(interval);
       clearInterval(tpInterval);
     };
-  }, [monitoring, channel]);
-
-  const handleStart = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const ch = channel.replace('https://kick.com/', '');
-      setChannel(ch);
-      const res = await fetch(`/api/monitor/${ch}`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to start monitoring');
-      setMonitoring(true);
-    } catch (e) {
-      setError('Could not start monitoring.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleStop = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      await fetch(`/api/stop/${channel}`, { method: 'POST' });
-      setMonitoring(false);
-    } catch (e) {
-      setError('Could not stop monitoring.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [channel]);
 
   // Prepare data for charts
   const sentimentData = stats ? [
@@ -118,20 +89,11 @@ function App() {
         <div className="input-group">
           <input
             type="text"
-            placeholder="Enter Kick.com stream URL or channel name"
+            placeholder="Enter Kick.com stream channel name"
             value={channel}
-            onChange={e => setChannel(e.target.value)}
-            disabled={monitoring || loading}
+            onChange={e => setChannel(e.target.value.replace('https://kick.com/', ''))}
+            disabled={loading}
           />
-          {!monitoring ? (
-            <button onClick={handleStart} disabled={!channel || loading}>
-              {loading ? 'Starting...' : 'Start Monitoring'}
-            </button>
-          ) : (
-            <button onClick={handleStop} disabled={loading}>
-              {loading ? 'Stopping...' : 'Stop'}
-            </button>
-          )}
         </div>
         {error && <div className="error-alert">{error}</div>}
         <div className="main-content">
@@ -139,7 +101,7 @@ function App() {
             <h2><FaComments /> Live Chat</h2>
             <div className="chat-box" ref={chatBoxRef}>
               {loading && <div className="loading">Loading chat...</div>}
-              {!loading && messages.length === 0 && <div className="empty">No messages yet.</div>}
+              {!loading && messages.length === 0 && <div className="empty">No messages yet. Waiting for Python service to ingest chat...</div>}
               {messages.map(msg => (
                 <div key={msg.id} className={`chat-msg ${msg.sentiment}`}>
                   <div className="chat-msg-header">
