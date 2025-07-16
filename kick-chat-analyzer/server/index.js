@@ -6,6 +6,7 @@ const { startMonitoring, stopMonitoring } = require('./chatMonitor');
 const http = require('http');
 const WebSocket = require('ws');
 const { generateTalkingPoints } = require('./gptAnalysis');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -93,6 +94,14 @@ app.get('/api/talking-points/:channel', async (req, res) => {
     }
   );
 });
+
+if (process.env.NODE_ENV === 'production') {
+  const clientBuildPath = path.join(__dirname, '../dist');
+  app.use(express.static(clientBuildPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
